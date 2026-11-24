@@ -26,12 +26,19 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Cordova and Build APK
+      - name: Install Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Android APK
+        env:
+          CI: true
         run: |
           npm install -g cordova
-          cordova platform add android
-          cordova plugin add cordova-plugin-camera cordova-plugin-file
-          cordova build android
+          cordova telemetry off
+          cordova platform add android@13.0.0 --no-interactive
+          cordova build android --no-interactive
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
