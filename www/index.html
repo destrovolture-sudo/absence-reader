@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>قارئ بطاقات الغياب</title>
+  <style>
+    :root {
+      --primary: #0f4c81;
+      --primary-dark: #093154;
+      --accent: #e67e22;
+      --bg: #f4f7f9;
+      --card: #ffffff;
+      --text: #1e293b;
+      --border: #cbd5e1;
+      --danger: #dc2626;
+      --success: #16a34a;
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding-bottom: 70px; }
+    
+    header {
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff; padding: 14px 16px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    header h1 { margin: 0; font-size: 1.1rem; }
+    header span { font-size: 0.75rem; opacity: 0.85; }
+
+    .container { padding: 12px; max-width: 800px; margin: 0 auto; }
+    .card {
+      background: var(--card); border-radius: 12px; padding: 14px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06); border: 1px solid var(--border);
+      margin-bottom: 14px;
+    }
+    .card-title { font-weight: bold; color: var(--primary); margin: 0 0 10px 0; font-size: 0.95rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      flex: 1; min-width: 120px; padding: 12px; border: none; border-radius: 8px;
+      font-weight: bold; font-size: 0.9rem; cursor: pointer; text-align: center;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-outline { background: #fff; color: var(--primary); border: 1.5px solid var(--primary); }
+    .btn:active { transform: scale(0.98); }
+
+    input[type="text"] {
+      width: 100%; padding: 10px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 0.9rem; margin-bottom: 8px;
+    }
+
+    .canvas-box {
+      position: relative; width: 100%; background: #1e293b; border-radius: 8px;
+      overflow: hidden; touch-action: none; margin-top: 10px; text-align: center;
+    }
+    canvas { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+
+    .legend {
+      display: flex; justify-content: space-around; background: #f8fafc;
+      padding: 8px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 10px;
+      border: 1px solid #e2e8f0;
+    }
+    .legend span b { color: var(--primary); font-size: 0.95rem; }
+
+    .summary-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px;
+    }
+    .stat-box {
+      background: #f1f5f9; padding: 10px 6px; border-radius: 8px; text-align: center;
+      border: 1px solid #e2e8f0;
+    }
+    .stat-box .val { font-size: 1.3rem; font-weight: 800; color: var(--primary); }
+    .stat-box .lbl { font-size: 0.75rem; color: #475569; }
+    .stat-box.total { background: #fef2f2; border-color: #fecaca; }
+    .stat-box.total .val { color: var(--danger); }
+
+    .table-wrap { overflow-x: auto; max-height: 420px; border: 1px solid var(--border); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.78rem; text-align: center; }
+    th, td { border: 1px solid #cbd5e1; padding: 5px 3px; min-width: 28px; }
+    th { background: var(--primary); color: #fff; position: sticky; top: 0; z-index: 5; }
+    th.sub { background: #1e6091; top: 26px; font-size: 0.7rem; }
+    td.day-col { background: #f1f5f9; font-weight: bold; position: sticky; right: 0; z-index: 4; }
+    td.cell { cursor: pointer; font-weight: bold; user-select: none; height: 28px; }
+    td.val-1 { background: #fef9c3; color: #854d0e; }
+    td.val-2 { background: #ffedd5; color: #9a3412; }
+    td.val-3 { background: #fee2e2; color: #991b1b; }
+    td.val-4 { background: #fecaca; color: #7f1d1d; }
+    td.val-D { background: #e2e8f0; color: #64748b; }
+
+    .alert-box {
+      padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-top: 10px;
+      background: #fffbeb; border: 1px solid #fde68a; color: #92400e; display: none;
+    }
+    .saved-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px; border-bottom: 1px solid #e2e8f0; font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>قارئ بطاقات الغياب</h1>
+    <span>الحراسة العامة للخارجية • نظام الترميز المعتمد</span>
+  </div>
+  <button class="btn-outline" style="padding:6px 10px; font-size:0.75rem; border-radius:6px;" onclick="resetAll()">بطاقة جديدة</button>
+</header>
+
+<div class="container">
+  <!-- 1. بيانات المتعلم والتقاط الصورة -->
+  <div class="card">
+    <div class="card-title">1. بيانات المتعلم وتصوير البطاقة</div>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="studentName" placeholder="الاسم الكامل للمتعلم..." style="flex:2;" />
+      <input type="text" id="studentClass" placeholder="القسم (مثلاً: TCSF-4)" style="flex:1;" />
+    </div>
+    
+    <div class="btn-row">
+      <label class="btn btn-primary">
+        📷 تصوير البطاقة بالكاميرا
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="loadImage(event)" />
+      </label>
+      <label class="btn btn-outline">
+        🖼️ اختيار من المعرض
+        <input type="file" id="galleryInput" accept="image/*" style="display:none;" onchange="loadImage(event)" />
+      </label>
+    </div>
+
+    <div id="cropSection" style="display:none; margin-top:12px;">
+      <p style="font-size:0.8rem; color:#475569; margin:0 0 6px 0;">
+        اسحب <b>الدوائر الحمراء الأربع</b> لوضعها على زوايا جدول الأشهر والأيام (من يوم 1 إلى 31):
+      </p>
+      <div class="btn-row" style="margin-bottom:6px;">
+        <button class="btn btn-outline" style="padding:6px; font-size:0.8rem;" onclick="rotateImg(-90)">↺ تدوير يسار</button>
+        <button class="btn btn-outline" style="padding:6px; font-size:0.8rem;" onclick="rotateImg(90)">↻ تدوير يمين</button>
+        <button class="btn btn-accent" style="padding:6px; font-size:0.85rem;" onclick="processGrid()">⚡ قراءة وحساب الساعات</button>
+      </div>
+      <div class="canvas-box">
+        <canvas id="mainCanvas"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. الحصيلة والجدول التفاعلي -->
+  <div class="card" id="resultCard" style="display:none;">
+    <div class="card-title">2. الحصيلة الإجمالية والتدقيق اليدوي</div>
+    
+    <div class="legend">
+      <span><b>•</b> = 1س</span>
+      <span><b>- / |</b> = 2س</span>
+      <span><b>×</b> = 3س</span>
+      <span><b>+</b> = 4س</span>
+      <span><b>D</b> = أحد (0)</span>
+    </div>
+
+    <div class="summary-grid">
+      <div class="stat-box">
+        <div class="val" id="morningTotal">0</div>
+        <div class="lbl">ساعات الصباح</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="eveningTotal">0</div>
+        <div class="lbl">ساعات المساء</div>
+      </div>
+      <div class="stat-box total">
+        <div class="val" id="grandTotal">0</div>
+        <div class="lbl">المجموع العام</div>
+      </div>
+    </div>
+
+    <div id="monthlyBadges" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; font-size:0.8rem;"></div>
+    <div id="adminAlert" class="alert-box"></div>
+
+    <p style="font-size:0.78rem; color:#64748b; margin:6px 0;">
+      * انقر على أي خانة في الجدول لتعديل قيمتها يدوياً (0 ← • ← - ← × ← + ← D):
+    </p>
+    <div class="table-wrap">
+      <table id="gridTable"></table>
+    </div>
+
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-success" onclick="saveRecord()">💾 حفظ في سجل الهاتف</button>
+      <button class="btn btn-primary" onclick="exportCSV()">📊 تصدير Excel</button>
+    </div>
+  </div>
+
+  <!-- 3. السجل المحفوظ على الهاتف -->
+  <div class="card">
+    <div class="card-title">3. سجل المتعلمين المحفوظ على الهاتف</div>
+    <div id="savedList"><p style="font-size:0.8rem; color:#64748b; margin:0;">لا توجد بطاقات محفوظة بعد.</p></div>
+  </div>
+</div>
+
+<canvas id="warpCanvas" style="display:none;"></canvas>
+
+<script>
+  const MONTHS = ["شتنبر", "أكتوبر", "نونبر", "دجنبر", "يناير", "فبراير", "مارس", "أبريل", "ماي", "يونيو"];
+  const COLS = 20; // 10 أشهر × 2 (صباح / مساء)
+  const ROWS = 31; // 31 يوماً
+  const STATES = [0, 1, 2, 3, 4, 'D'];
+  const LABELS = { 0: '', 1: '•', 2: '-', 3: '×', 4: '+', 'D': 'D' };
+
+  let rawImg = null;
+  let rotation = 0;
+  let pts = []; // [TL, TR, BR, BL]
+  let draggingIdx = -1;
+  let gridData = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+
+  const canvas = document.getElementById('mainCanvas');
+  const ctx = canvas.getContext('2d');
+
+  function loadImage(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      const img = new Image();
+      img.onload = function() {
+        rawImg = img;
+        rotation = 0;
+        document.getElementById('cropSection').style.display = 'block';
+        initCanvas();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function rotateImg(deg) {
+    rotation = (rotation + deg + 360) % 360;
+    initCanvas();
+  }
+
+  function initCanvas() {
+    if (!rawImg) return;
+    const maxW = 600;
+    let w = (rotation % 180 === 0) ? rawImg.width : rawImg.height;
+    let h = (rotation % 180 === 0) ? rawImg.height : rawImg.width;
+    const scale = Math.min(1, maxW / w);
+    canvas.width = w * scale;
+    canvas.height = h * scale;
+
+    const padX = canvas.width * 0.12;
+    const padY = canvas.height * 0.12;
+    pts = [
+      { x: padX, y: padY },
+      { x: canvas.width - padX, y: padY },
+      { x: canvas.width - padX, y: canvas.height - padY },
+      { x: padX, y: canvas.height - padY }
+    ];
+    drawCanvas();
+  }
+
+  function drawCanvas() {
+    if (!rawImg) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((rotation * Math.PI) / 180);
+    const drawW = (rotation % 180 === 0) ? canvas.width : canvas.height;
+    const drawH = (rotation % 180 === 0) ? canvas.height : canvas.width;
+    ctx.drawImage(rawImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
+
+    // رسم الإطار المحدد
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < 4; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.stroke();
+
+    // رسم الدوائر الحمراء للتحكم باللمس
+    pts.forEach((p, idx) => {
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+  }
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * (canvas.width / rect.width),
+      y: (clientY - rect.top) * (canvas.height / rect.height)
+    };
+  }
+
+  function onStart(e) {
+    const pos = getPos(e);
+    draggingIdx = pts.findIndex(p => Math.hypot(p.x - pos.x, p.y - pos.y) < 32);
+    if (draggingIdx !== -1) e.preventDefault();
+  }
+  function onMove(e) {
+    if (draggingIdx === -1) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    pts[draggingIdx].x = Math.max(0, Math.min(canvas.width, pos.x));
+    pts[draggingIdx].y = Math.max(0, Math.min(canvas.height, pos.y));
+    drawCanvas();
+  }
+  function onEnd() { draggingIdx = -1; }
+
+  canvas.addEventListener('mousedown', onStart);
+  canvas.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+  canvas.addEventListener('touchstart', onStart, { passive: false });
+  canvas.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onEnd);
+
+  // التحويل المنظوري (Bilinear Grid Sampling) وتحليل الحبر داخل كل خلية
+  function processGrid() {
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+    const tCtx = tempCanvas.getContext('2d');
+    tCtx.translate(tempCanvas.width / 2, tempCanvas.height / 2);
+    tCtx.rotate((rotation * Math.PI) / 180);
+    const drawW = (rotation % 180 === 0) ? tempCanvas.width : tempCanvas.height;
+    const drawH = (rotation % 180 === 0) ? tempCanvas.height : tempCanvas.width;
+    tCtx.drawImage(rawImg, -drawW / 2, -drawH / 2, drawW, drawH);
+
+    const imgData = tCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height).data;
+    const W = tempCanvas.width;
+
+    // أخذ عينة إحصائية من وسط كل خلية لتجنب خطوط الشبكة المطبوعة
+    for (let r = 0; r < ROWS; r++) {
+      const v0 = (r + 0.25) / ROWS;
+      const v1 = (r + 0.75) / ROWS;
+      for (let c = 0; c < COLS; c++) {
+        const u0 = (c + 0.25) / COLS;
+        const u1 = (c + 0.75) / COLS;
+
+        let darkPixels = 0;
+        let redPixels = 0;
+        let totalSamples = 0;
+
+        for (let sy = 0; sy <= 6; sy++) {
+          const v = v0 + (v1 - v0) * (sy / 6);
+          for (let sx = 0; sx <= 6; sx++) {
+            const u = u0 + (u1 - u0) * (sx / 6);
+            // Bilinear interpolation between pts[0..3]
+            const topX = pts[0].x + (pts[1].x - pts[0].x) * u;
+            const topY = pts[0].y + (pts[1].y - pts[0].y) * u;
+            const botX = pts[3].x + (pts[2].x - pts[3].x) * u;
+            const botY = pts[3].y + (pts[2].y - pts[3].y) * u;
+            const px = Math.round(topX + (botX - topX) * v);
+            const py = Math.round(topY + (botY - topY) * v);
+
+            const idx = (py * W + px) * 4;
+            const R = imgData[idx], G = imgData[idx + 1], B = imgData[idx + 2];
+            const lum = 0.299 * R + 0.587 * G + 0.114 * B;
+
+            if (lum < 145) {
+              darkPixels++;
+              if (R > G + 35 && R > B + 35) redPixels++;
+            }
+            totalSamples++;
+          }
+        }
+
+        const ratio = darkPixels / totalSamples;
+        if (ratio < 0.08) {
+          gridData[r][c] = 0;
+        } else if (redPixels > darkPixels * 0.65 && ratio > 0.28) {
+          gridData[r][c] = 'D';
+        } else if (ratio < 0.18) {
+          gridData[r][c] = 1; // نقطة
+        } else if (ratio < 0.30) {
+          gridData[r][c] = 2; // خط
+        } else if (ratio < 0.42) {
+          gridData[r][c] = 3; // علامة ×
+        } else {
+          gridData[r][c] = 4; // علامة +
+        }
+      }
+    }
+
+    document.getElementById('resultCard').style.display = 'block';
+    renderTable();
+    recalculate();
+  }
+
+  function renderTable() {
+    const table = document.getElementById('gridTable');
+    let html = '<thead><tr><th rowspan="2">اليوم</th>';
+    MONTHS.forEach(m => html += `<th colspan="2">${m}</th>`);
+    html += '</tr><tr>';
+    MONTHS.forEach(() => html += '<th class="sub">ص</th><th class="sub">م</th>');
+    html += '</tr></thead><tbody>';
+
+    for (let r = 0; r < ROWS; r++) {
+      html += `<tr><td class="day-col">${r + 1}</td>`;
+      for (let c = 0; c < COLS; c++) {
+        const val = gridData[r][c];
+        html += `<td class="cell val-${val}" onclick="toggleCell(${r},${c},this)">${LABELS[val]}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    table.innerHTML = html;
+  }
+
+  function toggleCell(r, c, el) {
+    const cur = gridData[r][c];
+    const next = STATES[(STATES.indexOf(cur) + 1) % STATES.length];
+    gridData[r][c] = next;
+    el.className = `cell val-${next}`;
+    el.textContent = LABELS[next];
+    recalculate();
+  }
+
+  function recalculate() {
+    let morning = 0, evening = 0;
+    let monthTotals = Array(10).fill(0);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const v = gridData[r][c];
+        if (typeof v === 'number' && v > 0) {
+          if (c % 2 === 0) morning += v;
+          else evening += v;
+          monthTotals[Math.floor(c / 2)] += v;
+        }
+      }
+    }
+
+    const total = morning + evening;
+    document.getElementById('morningTotal').textContent = morning;
+    document.getElementById('eveningTotal').textContent = evening;
+    document.getElementById('grandTotal').textContent = total;
+
+    const badges = document.getElementById('monthlyBadges');
+    badges.innerHTML = MONTHS.map((m, i) => 
+      monthTotals[i] > 0 ? `<span style="background:#e2e8f0; padding:4px 8px; border-radius:6px;"><b>${m}:</b> ${monthTotals[i]}س</span>` : ''
+    ).join('');
+
+    const alertBox = document.getElementById('adminAlert');
+    if (total >= 30) {
+      alertBox.style.display = 'block';
+      alertBox.innerHTML = `⚠️ <b>تنبيه إداري:</b> بلغ مجموع غياب المتعلم <b>${total} ساعة</b>؛ يستوجب تفعيل المسطرة التأديبية (إنذار / توبيخ / مجلس الانضباط).`;
+    } else {
+      alertBox.style.display = 'none';
+    }
+  }
+
+  function saveRecord() {
+    const name = document.getElementById('studentName').value.trim() || 'متعلم بدون اسم';
+    const cls = document.getElementById('studentClass').value.trim() || '-';
+    const total = document.getElementById('grandTotal').textContent;
+    const records = JSON.parse(localStorage.getItem('absence_records') || '[]');
+    records.unshift({ name, cls, total, date: new Date().toLocaleDateString('ar-MA') });
+    localStorage.setItem('absence_records', JSON.stringify(records));
+    renderSaved();
+    alert('تم حفظ بطاقة المتعلم في ذاكرة الهاتف بنجاح.');
+  }
+
+  function renderSaved() {
+    const records = JSON.parse(localStorage.getItem('absence_records') || '[]');
+    const container = document.getElementById('savedList');
+    if (!records.length) return;
+    container.innerHTML = records.map((rec, i) => `
+      <div class="saved-item">
+        <div><b>${rec.name}</b> (${rec.cls})<br><small style="color:#64748b;">${rec.date}</small></div>
+        <div><b style="color:#dc2626; font-size:1rem;">${rec.total} ساعة</b></div>
+      </div>
+    `).join('');
+  }
+
+  function exportCSV() {
+    const name = document.getElementById('studentName').value.trim() || 'متعلم';
+    const cls = document.getElementById('studentClass').value.trim() || '';
+    let csv = '\uFEFFاليوم,' + MONTHS.map(m => `${m} (ص),${m} (م)`).join(',') + '\n';
+    for (let r = 0; r < ROWS; r++) {
+      csv += `${r + 1},` + gridData[r].map(v => v === 'D' ? 'أحد' : v).join(',') + '\n';
+    }
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `غياب_${name}_${cls}.csv`;
+    link.click();
+  }
+
+  function resetAll() {
+    document.getElementById('studentName').value = '';
+    document.getElementById('studentClass').value = '';
+    document.getElementById('cropSection').style.display = 'none';
+    document.getElementById('resultCard').style.display = 'none';
+    gridData = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  }
+
+  renderSaved();
+</script>
+</body>
+  </html>
