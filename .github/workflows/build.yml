@@ -26,17 +26,15 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Gradle 8.7
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.7'
-
-      - name: Build Android APK
+      - name: Create and Build Cordova App
         env:
           CI: true
         run: |
           npm install -g cordova
           cordova telemetry off
+          cordova create app_build ma.education.absencereader "AbsenceReader"
+          cp www/index.html app_build/www/index.html
+          cd app_build
           cordova platform add android@13.0.0 --no-interactive
           cordova build android --no-interactive
 
@@ -44,4 +42,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Absence-Card-Reader-APK
-          path: platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          path: app_build/platforms/android/app/build/outputs/apk/debug/app-debug.apk
